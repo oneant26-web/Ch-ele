@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>새친구 관리 - 동신교회 초등부</title>
+<?!= include('Common'); ?>
+<style>
+  .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #276749, #48bb78); padding: 24px; }
+  .login-card { background: #fff; border-radius: 20px; padding: 32px 24px; width: 100%; max-width: 360px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+  .login-logo { text-align: center; font-size: 40px; margin-bottom: 16px; }
+  .login-title { text-align: center; font-size: 20px; font-weight: 700; color: #276749; margin-bottom: 24px; }
+
+  .nf-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    border-left: 5px solid #ed8936;
+  }
+  .nf-card.ready { border-left-color: #276749; }
+  .nf-card.alert { border-left-color: #e53e3e; }
+
+  .nf-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .nf-name { font-size: 20px; font-weight: 700; }
+  .nf-sub { font-size: 13px; color: #718096; margin-top: 2px; }
+
+  .visit-section { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .visit-count { font-size: 28px; font-weight: 800; color: #2c5282; }
+  .visit-label { font-size: 13px; color: #718096; }
+  .visit-btn {
+    background: #ebf4ff; border: 2px solid #bee3f8; border-radius: 10px;
+    color: #2c5282; font-size: 18px; font-weight: 700;
+    padding: 10px 18px; cursor: pointer; min-height: 48px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .visit-btn:active { transform: scale(0.93); }
+
+  .visit-bar { height: 10px; background: #e2e8f0; border-radius: 5px; margin-bottom: 10px; overflow: hidden; }
+  .visit-progress { height: 100%; border-radius: 5px; transition: width 0.4s ease; }
+  .progress-1 { background: #fc8181; }
+  .progress-2 { background: #f6ad55; }
+  .progress-3 { background: #68d391; }
+  .progress-4 { background: #4299e1; }
+
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+
+  .promote-btn {
+    background: #276749; color: #fff; border: none; border-radius: 10px;
+    padding: 12px 16px; font-size: 15px; font-weight: 700; cursor: pointer;
+    width: 100%; min-height: 48px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .promote-btn:disabled { background: #a0aec0; cursor: not-allowed; }
+  .promote-btn:active:not(:disabled) { transform: scale(0.97); }
+
+  /* 모달 */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: none; align-items: flex-end; justify-content: center; z-index: 200;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-sheet {
+    background: #fff; border-radius: 20px 20px 0 0;
+    padding: 24px; width: 100%; max-width: 600px;
+    max-height: 80vh; overflow-y: auto;
+  }
+  .modal-title { font-size: 18px; font-weight: 700; color: #276749; margin-bottom: 16px; }
+
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+  .filter-btn {
+    padding: 8px 14px; border-radius: 20px; border: 2px solid #e2e8f0;
+    font-size: 14px; font-weight: 600; cursor: pointer; background: #fff; color: #4a5568;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .filter-btn.active { background: #276749; border-color: #276749; color: #fff; }
+
+  .stats-bar { background: #f0fff4; border: 2px solid #c6f6d5; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; }
+  .stats-bar .stat-row { display: flex; justify-content: space-between; font-size: 14px; padding: 2px 0; }
+  .stats-bar strong { color: #276749; }
+</style>
+</head>
+<body>
+<div id="loading" class="loading-overlay" style="display:none"><div class="loading-spinner"></div></div>
+<div id="toast" class="toast"></div>
+
+<!-- 로그인 -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🌟</div>
+    <div class="login-title">새친구 관리</div>
+    <div class="form-group">
+      <label class="form-label">이름</label>
+      <select id="loginSelect" class="form-control">
+        <option value="">-- 선택하세요 --</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">핀번호</label>
+      <input type="password" id="loginPin" class="form-control" maxlength="4" placeholder="4자리 핀번호" inputmode="numeric">
+    </div>
+    <button class="btn btn-success btn-full" onclick="doLogin()" style="margin-top:8px">로그인</button>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div id="mainScreen" style="display:none">
+  <div class="top-bar" style="background:#276749">
+    <button class="back-btn" onclick="logout()">← 로그아웃</button>
+    <h1>새친구 관리</h1>
+    <button class="back-btn" onclick="reload()">🔄</button>
+  </div>
+
+  <div class="container" style="padding-top:12px">
+    <div id="statsBar" class="stats-bar" style="display:none"></div>
+
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="setFilter('all', this)">전체</button>
+      <button class="filter-btn" onclick="setFilter('alert', this)">⚠️ 4회이상</button>
+      <button class="filter-btn" onclick="setFilter('ready', this)">✅ 배치가능</button>
+    </div>
+
+    <div id="friendList"></div>
+  </div>
+</div>
+
+<!-- 배치 모달 -->
+<div id="promoteModal" class="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-title">🎉 일반반 배치</div>
+    <div id="promoteStudentName" style="font-size:16px;margin-bottom:12px;color:#4a5568"></div>
+    <div class="form-group">
+      <label class="form-label">배치할 반 선택</label>
+      <select id="promoteClass" class="form-control"></select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-gray" style="flex:1" onclick="closeModal()">취소</button>
+      <button class="btn btn-success" style="flex:2" onclick="doPromote()">✅ 배치 완료</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let userInfo = null;
+let friends = [];
+let allClasses = [];
+let currentFilter = 'all';
+let promoteTargetId = null;
+
+function initLogin() {
+  callApi('apiGetTeacherList', [], function(err, list) {
+    if (err) return;
+    const sel = document.getElementById('loginSelect');
+    list.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name;
+      opt.textContent = t.name + (t.role === '임원' ? ' (임원)' : '');
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function doLogin() {
+  const name = document.getElementById('loginSelect').value;
+  const pin = document.getElementById('loginPin').value;
+  if (!name || !pin) { showToast('이름과 핀번호를 입력하세요', 'error'); return; }
+  callApi('apiLogin', [name, pin], function(err, res) {
+    if (err || !res.ok) { showToast(res ? res.message : '로그인 실패', 'error'); return; }
+    userInfo = res;
+    showMain();
+  });
+}
+
+function logout() {
+  userInfo = null;
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('mainScreen').style.display = 'none';
+}
+
+function showMain() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainScreen').style.display = 'block';
+  reload();
+  callApi('apiGetClassList', [], function(err, data) {
+    if (!err) { allClasses = data; populatePromoteClass(); }
+  });
+}
+
+function reload() {
+  callApi('apiGetNewFriends', [], function(err, data) {
+    if (err) return;
+    friends = data;
+    renderStats();
+    render();
+  });
+}
+
+function renderStats() {
+  const total = friends.length;
+  const alert4 = friends.filter(f => f.newVisits >= 4 && f.newVisits < 6).length;
+  const ready6 = friends.filter(f => f.newVisits >= 6).length;
+  const statsBar = document.getElementById('statsBar');
+  statsBar.style.display = 'block';
+  statsBar.innerHTML = `
+    <div class="stat-row"><span>전체 새친구</span><strong>${total}명</strong></div>
+    <div class="stat-row"><span>⚠️ 4회 이상 (배치 권장)</span><strong>${alert4}명</strong></div>
+    <div class="stat-row"><span>✅ 6회 이상 (배치 가능)</span><strong>${ready6}명</strong></div>
+  `;
+}
+
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function render() {
+  let data = friends;
+  if (currentFilter === 'alert') data = friends.filter(f => f.newVisits >= 4 && f.newVisits < 6);
+  if (currentFilter === 'ready') data = friends.filter(f => f.newVisits >= 6);
+  data = [...data].sort((a,b) => b.newVisits - a.newVisits);
+
+  if (!data.length) {
+    document.getElementById('friendList').innerHTML = '<div class="card" style="text-align:center;color:#718096;padding:30px">해당하는 새친구가 없습니다</div>';
+    return;
+  }
+
+  let html = '';
+  data.forEach(f => {
+    const v = f.newVisits;
+    const pct = Math.min((v / 6) * 100, 100);
+    const progClass = v >= 6 ? 'progress-4' : v >= 4 ? 'progress-3' : v >= 2 ? 'progress-2' : 'progress-1';
+    const cardClass = v >= 6 ? 'ready' : v >= 4 ? 'alert' : '';
+
+    let badges = '';
+    if (v >= 4) badges += '<span class="badge badge-orange">4회 달성</span> ';
+    if (v >= 5) badges += '<span class="badge badge-green">5회 달성</span> ';
+    if (v >= 6) badges += '<span class="badge badge-blue">6회 달성 🎉</span> ';
+
+    html += `<div class="nf-card ${cardClass}">
+      <div class="nf-header">
+        <div>
+          <div class="nf-name">${f.name}</div>
+          <div class="nf-sub">${f.part} | ${f.grade}학년 | 등록일: ${f.newDate || '-'}</div>
+        </div>
+      </div>
+      <div class="visit-section">
+        <div>
+          <div class="visit-count">${v}회</div>
+          <div class="visit-label">방문 횟수</div>
+        </div>
+        <div style="flex:1">
+          <div class="visit-bar"><div class="visit-progress ${progClass}" style="width:${pct}%"></div></div>
+          <div style="font-size:12px;color:#718096;text-align:right">${v}/6회</div>
+        </div>
+        <button class="visit-btn" onclick="addVisit('${f.id}')">+1 방문</button>
+      </div>
+      ${badges ? '<div class="badges">' + badges + '</div>' : ''}
+      <button class="promote-btn" onclick="openPromote('${f.id}','${f.name}')" ${v < 6 ? 'disabled' : ''}>
+        ${v >= 6 ? '🏠 일반반 배치' : '일반반 배치 (6회 이상 가능)'}
+      </button>
+    </div>`;
+  });
+  document.getElementById('friendList').innerHTML = html;
+}
+
+function addVisit(studentId) {
+  callApi('apiIncrementVisit', [studentId], function(err, res) {
+    if (err || !res.ok) { showToast('오류 발생', 'error'); return; }
+    const f = friends.find(x => x.id === studentId);
+    if (f) { f.newVisits = res.newVisits; }
+    renderStats();
+    render();
+    showToast('방문 +1 기록 완료! (' + res.newVisits + '회)', 'success');
+  });
+}
+
+function populatePromoteClass() {
+  const sel = document.getElementById('promoteClass');
+  sel.innerHTML = '<option value="">-- 반 선택 --</option>';
+  allClasses.sort((a,b) => a.name.localeCompare(b.name)).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.name;
+    opt.dataset.teacher = c.teacher;
+    opt.textContent = c.name + ' (' + c.teacher + ')';
+    sel.appendChild(opt);
+  });
+}
+
+function openPromote(studentId, name) {
+  promoteTargetId = studentId;
+  document.getElementById('promoteStudentName').textContent = name + ' 학생을 일반반으로 배치합니다.';
+  document.getElementById('promoteModal').classList.add('show');
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('promoteModal')) {
+    document.getElementById('promoteModal').classList.remove('show');
+    promoteTargetId = null;
+  }
+}
+
+function doPromote() {
+  const sel = document.getElementById('promoteClass');
+  const newClass = sel.value;
+  const newTeacher = sel.options[sel.selectedIndex].dataset.teacher || '';
+  if (!newClass) { showToast('반을 선택하세요', 'error'); return; }
+  callApi('apiPromoteNewFriend', [promoteTargetId, newClass, newTeacher], function(err, res) {
+    if (err || !res.ok) { showToast('배치 실패', 'error'); return; }
+    closeModal();
+    showToast('✅ 일반반 배치 완료!', 'success');
+    friends = friends.filter(f => f.id !== promoteTargetId);
+    renderStats();
+    render();
+  });
+}
+
+initLogin();
+</script>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>출석체크 - 동신교회 초등부</title>
+<?!= include('Common'); ?>
+<style>
+  .date-info {
+    background: linear-gradient(135deg, #2c5282, #4299e1);
+    color: #fff;
+    padding: 16px;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .date-info .date-text { font-size: 20px; font-weight: 700; }
+  .date-info .part-text { font-size: 16px; margin-top: 4px; opacity: 0.9; }
+
+  .class-section { margin-bottom: 20px; }
+  .class-header {
+    background: #ebf4ff;
+    border-left: 4px solid #4299e1;
+    padding: 10px 14px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #2c5282;
+    margin-bottom: 10px;
+    border-radius: 0 8px 8px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .class-count { font-size: 14px; font-weight: 400; color: #4a5568; }
+
+  .student-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  @media (max-width: 360px) { .student-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .student-btn {
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 8px;
+    font-size: 17px;
+    font-weight: 600;
+    color: #2d3748;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .student-btn.checked {
+    background: #276749;
+    border-color: #276749;
+    color: #fff;
+  }
+  .student-btn.new-friend {
+    border-color: #ed8936;
+    background: #fffaf0;
+  }
+  .student-btn.new-friend.checked {
+    background: #ed8936;
+    border-color: #ed8936;
+    color: #fff;
+  }
+  .student-btn:active { transform: scale(0.94); }
+  .check-icon { font-size: 20px; }
+  .student-type { font-size: 11px; font-weight: 400; opacity: 0.8; }
+
+  .save-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #fff;
+    padding: 12px 16px;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.12);
+    display: flex;
+    gap: 10px;
+    z-index: 50;
+  }
+  .summary-bar {
+    background: #fff;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 15px;
+    color: #4a5568;
+    text-align: center;
+  }
+  .summary-bar strong { color: #276749; }
+  .pb-safe { padding-bottom: 80px; }
+</style>
+</head>
+<body>
+<div id="loading" class="loading-overlay" style="display:none"><div class="loading-spinner"></div></div>
+<div id="toast" class="toast"></div>
+
+<div class="top-bar">
+  <h1 id="pageTitle">출석체크</h1>
+</div>
+
+<div class="date-info">
+  <div class="date-text" id="dateDisplay">날짜 로딩 중...</div>
+  <div class="part-text" id="partDisplay"></div>
+</div>
+
+<div class="summary-bar">
+  출석: <strong id="checkedCount">0</strong>명 / 전체 <strong id="totalCount">0</strong>명
+</div>
+
+<div class="container pb-safe">
+  <div id="classList"></div>
+</div>
+
+<div class="save-bar">
+  <button class="btn btn-gray" style="min-width:100px" onclick="resetAll()">전체 취소</button>
+  <button class="btn btn-success btn-full" onclick="saveAll()">✅ 저장 완료</button>
+</div>
+
+<script>
+const params = JSON.parse('<?= params ?>');
+const part = params.part || '1부';
+const targetDate = params.date || getSunday();
+
+let allStudents = [];
+const checked = {};
+
+function getSunday() {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay());
+  return d.getFullYear() + '-' + padZero(d.getMonth()+1) + '-' + padZero(d.getDate());
+}
+
+function init() {
+  const d = new Date(targetDate);
+  document.getElementById('dateDisplay').textContent =
+    d.getFullYear() + '년 ' + (d.getMonth()+1) + '월 ' + d.getDate() + '일 (일)';
+  document.getElementById('partDisplay').textContent = part + ' 예배';
+  document.getElementById('pageTitle').textContent = part + ' 출석체크';
+
+  callApi('apiGetAttendance', [part, targetDate], function(err, data) {
+    if (err) return;
+    allStudents = data.students;
+    Object.keys(data.checked).forEach(id => { checked[id] = true; });
+    render();
+  });
+}
+
+function render() {
+  const classes = {};
+  allStudents.forEach(s => {
+    if (!classes[s.class]) classes[s.class] = [];
+    classes[s.class].push(s);
+  });
+
+  let total = 0, cnt = 0;
+  let html = '';
+
+  const sortedClasses = Object.keys(classes).sort();
+  sortedClasses.forEach(cls => {
+    const students = classes[cls];
+    let classCnt = 0;
+    let btnHtml = '';
+    students.forEach(s => {
+      const isChecked = !!checked[s.id];
+      const isNew = s.type === '새친구';
+      if (isChecked) classCnt++;
+      btnHtml += `<button class="student-btn${isChecked?' checked':''}${isNew?' new-friend':''}"
+        onclick="toggle('${s.id}')" id="btn_${s.id}">
+        <span class="check-icon">${isChecked ? '✅' : (isNew ? '🌟' : '👤')}</span>
+        <span>${s.name}</span>
+        ${isNew ? '<span class="student-type">새친구</span>' : ''}
+      </button>`;
+      total++;
+    });
+    html += `<div class="class-section">
+      <div class="class-header">
+        <span>${cls}</span>
+        <span class="class-count">${classCnt}/${students.length}명 출석</span>
+      </div>
+      <div class="student-grid">${btnHtml}</div>
+    </div>`;
+  });
+
+  cnt = Object.keys(checked).filter(id => checked[id]).length;
+  document.getElementById('classList').innerHTML = html;
+  document.getElementById('checkedCount').textContent = cnt;
+  document.getElementById('totalCount').textContent = total;
+}
+
+function toggle(studentId) {
+  const newState = !checked[studentId];
+  checked[studentId] = newState;
+  callApi('apiToggleAttendance', [studentId, targetDate, newState], function(err) {
+    if (err) {
+      checked[studentId] = !newState;
+      return;
+    }
+    const btn = document.getElementById('btn_' + studentId);
+    const student = allStudents.find(s => s.id === studentId);
+    const isNew = student && student.type === '새친구';
+    if (newState) {
+      btn.classList.add('checked');
+      btn.querySelector('.check-icon').textContent = '✅';
+    } else {
+      btn.classList.remove('checked');
+      btn.querySelector('.check-icon').textContent = isNew ? '🌟' : '👤';
+    }
+    const cnt = Object.keys(checked).filter(id => checked[id]).length;
+    document.getElementById('checkedCount').textContent = cnt;
+    // 반별 카운트 업데이트
+    updateClassCount(student.class);
+  });
+}
+
+function updateClassCount(cls) {
+  const classStudents = allStudents.filter(s => s.class === cls);
+  const cnt = classStudents.filter(s => checked[s.id]).length;
+  const headers = document.querySelectorAll('.class-header');
+  headers.forEach(h => {
+    if (h.querySelector('span').textContent === cls) {
+      h.querySelector('.class-count').textContent = cnt + '/' + classStudents.length + '명 출석';
+    }
+  });
+}
+
+function resetAll() {
+  if (!confirm('전체 출석을 취소하시겠습니까?')) return;
+  allStudents.forEach(s => { checked[s.id] = false; });
+  render();
+  allStudents.forEach(s => {
+    google.script.run.apiToggleAttendance(s.id, targetDate, false);
+  });
+}
+
+function saveAll() {
+  const cnt = Object.keys(checked).filter(id => checked[id]).length;
+  showToast('✅ 출석 ' + cnt + '명 저장 완료!', 'success');
+}
+
+init();
+</script>
+</body>
+</html>

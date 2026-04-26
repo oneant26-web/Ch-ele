@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>임원 대시보드 - 동신교회 초등부</title>
+<?!= include('Common'); ?>
+<style>
+  /* 로그인 */
+  .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #744210, #c05621); padding: 24px; }
+  .login-card { background: #fff; border-radius: 20px; padding: 32px 24px; width: 100%; max-width: 360px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+  .login-logo { text-align: center; font-size: 40px; margin-bottom: 16px; }
+  .login-title { text-align: center; font-size: 20px; font-weight: 700; color: #744210; margin-bottom: 24px; }
+
+  /* 탭 */
+  .tab-bar {
+    display: flex; overflow-x: auto; background: #fff; border-bottom: 2px solid #e2e8f0;
+    position: sticky; top: 56px; z-index: 90;
+    scrollbar-width: none;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    flex-shrink: 0; padding: 12px 16px; font-size: 14px; font-weight: 600;
+    color: #718096; border: none; background: none; cursor: pointer;
+    border-bottom: 3px solid transparent; white-space: nowrap;
+    min-height: 48px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tab-btn.active { color: #c05621; border-bottom-color: #c05621; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* 주간 현황 */
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .summary-cell {
+    background: #fff; border-radius: 12px; padding: 14px; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  }
+  .summary-cell .part-label { font-size: 13px; color: #718096; font-weight: 600; margin-bottom: 8px; }
+  .summary-cell .grade-row { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
+  .summary-cell .grade-row:last-child { border: none; }
+  .summary-cell .count { font-weight: 700; color: #276749; }
+
+  /* 점수 순위 */
+  .rank-controls { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .rank-table { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+  .rank-table th { background: #2c5282; color: #fff; padding: 10px 8px; text-align: left; }
+  .rank-table td { padding: 10px 8px; border-bottom: 1px solid #f0f0f0; }
+  .rank-table tr:last-child td { border: none; }
+  .rank-table tr:nth-child(even) td { background: #f7fafc; }
+  .rank-num { font-weight: 700; color: #c05621; }
+  .rank-1 td { background: #fffbf0 !important; }
+  .rank-2 td { background: #f8f8ff !important; }
+  .rank-3 td { background: #fff8f0 !important; }
+
+  /* 반이동 */
+  .move-step { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+  .move-step-title { font-size: 14px; font-weight: 700; color: #4a5568; margin-bottom: 10px; }
+
+  /* 생일 */
+  .birthday-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid #f0f0f0; }
+  .birthday-item:last-child { border: none; }
+  .birthday-icon { font-size: 24px; }
+  .birthday-name { font-size: 16px; font-weight: 700; }
+  .birthday-date { font-size: 13px; color: #718096; }
+  .birthday-info { font-size: 13px; color: #718096; }
+
+  /* 점수기준 */
+  .criteria-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .criteria-item:last-child { border: none; }
+  .criteria-name { flex: 1; font-size: 16px; font-weight: 600; }
+  .criteria-input { width: 80px; text-align: center; border: 2px solid #e2e8f0; border-radius: 8px; padding: 8px; font-size: 16px; font-weight: 700; }
+
+  /* 학생추가 */
+  .add-form { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+
+  .pb-safe { padding-bottom: 20px; }
+</style>
+</head>
+<body>
+<div id="loading" class="loading-overlay" style="display:none"><div class="loading-spinner"></div></div>
+<div id="toast" class="toast"></div>
+
+<!-- 로그인 -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">👑</div>
+    <div class="login-title">임원 로그인</div>
+    <div class="form-group">
+      <label class="form-label">이름</label>
+      <select id="adminSelect" class="form-control">
+        <option value="">-- 선택하세요 --</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">핀번호</label>
+      <input type="password" id="adminPin" class="form-control" maxlength="4" placeholder="4자리 핀번호" inputmode="numeric">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="doLogin()" style="background:#c05621;margin-top:8px">로그인</button>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div id="mainScreen" style="display:none">
+  <div class="top-bar" style="background:#744210">
+    <button class="back-btn" onclick="logout()">← 로그아웃</button>
+    <h1>임원 대시보드</h1>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('summary')">📊 주간현황</button>
+    <button class="tab-btn" onclick="showTab('rank')">🏆 점수순위</button>
+    <button class="tab-btn" onclick="showTab('move')">🔄 반이동</button>
+    <button class="tab-btn" onclick="showTab('birthday')">🎂 생일조회</button>
+    <button class="tab-btn" onclick="showTab('criteria')">⚙️ 점수기준</button>
+    <button class="tab-btn" onclick="showTab('addstudent')">➕ 학생추가</button>
+  </div>
+
+  <div class="container pb-safe">
+
+    <!-- 주간 현황 -->
+    <div id="panel-summary" class="tab-panel active">
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">기준 주일</label>
+        <div style="display:flex;gap:8px">
+          <input type="date" id="summaryDate" class="form-control" onchange="loadSummary()">
+          <button class="btn btn-outline" onclick="setSummaryThisSunday()">이번주</button>
+        </div>
+      </div>
+      <div id="summaryContent"></div>
+    </div>
+
+    <!-- 점수 순위 -->
+    <div id="panel-rank" class="tab-panel">
+      <div class="rank-controls" style="margin-top:12px">
+        <select id="rankFilter" class="form-control" style="flex:1" onchange="renderRank()">
+          <option value="">전체</option>
+        </select>
+        <select id="rankSort" class="form-control" style="width:120px" onchange="renderRank()">
+          <option value="score">점수순</option>
+          <option value="class">반별</option>
+        </select>
+      </div>
+      <div id="rankContent"></div>
+    </div>
+
+    <!-- 반 이동 -->
+    <div id="panel-move" class="tab-panel">
+      <div style="margin-top:12px">
+        <div class="move-step">
+          <div class="move-step-title">1단계: 이동할 학생 선택</div>
+          <select id="moveStudent" class="form-control" onchange="onSelectMoveStudent()">
+            <option value="">-- 학생 선택 --</option>
+          </select>
+          <div id="moveStudentInfo" style="margin-top:8px;font-size:14px;color:#718096"></div>
+        </div>
+        <div class="move-step">
+          <div class="move-step-title">2단계: 이동할 반 선택</div>
+          <select id="moveTargetClass" class="form-control">
+            <option value="">-- 반 선택 --</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="doMoveStudent()">반 이동 실행</button>
+      </div>
+    </div>
+
+    <!-- 생일 조회 -->
+    <div id="panel-birthday" class="tab-panel">
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <select id="birthdayMonth" class="form-control">
+          <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+          <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+          <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
+          <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadBirthdays()">조회</button>
+      </div>
+      <div class="card" style="margin-top:12px;padding:0">
+        <div id="birthdayList" style="padding:8px"></div>
+      </div>
+    </div>
+
+    <!-- 점수 기준 -->
+    <div id="panel-criteria" class="tab-panel">
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">⚙️ 점수 기준 수정</div>
+        <div id="criteriaList"></div>
+        <button class="btn btn-primary btn-full" style="margin-top:12px" onclick="saveCriteria()">저장</button>
+      </div>
+    </div>
+
+    <!-- 학생 추가 -->
+    <div id="panel-addstudent" class="tab-panel">
+      <div class="add-form" style="margin-top:12px">
+        <div class="card-title">➕ 새 학생 추가</div>
+        <div class="form-group"><label class="form-label">이름</label><input type="text" id="newName" class="form-control" placeholder="학생 이름"></div>
+        <div class="form-group"><label class="form-label">성별</label>
+          <select id="newGender" class="form-control"><option value="남">남</option><option value="여">여</option></select></div>
+        <div class="form-group"><label class="form-label">생일</label><input type="date" id="newBirthday" class="form-control"></div>
+        <div class="form-group"><label class="form-label">연락처</label><input type="tel" id="newContact" class="form-control" placeholder="010-0000-0000"></div>
+        <div class="form-group"><label class="form-label">부</label>
+          <select id="newPart" class="form-control"><option value="1부">1부</option><option value="2부">2부</option></select></div>
+        <div class="form-group"><label class="form-label">학년</label>
+          <select id="newGrade" class="form-control"><option value="3">3학년</option><option value="4">4학년</option></select></div>
+        <div class="form-group"><label class="form-label">반</label>
+          <select id="newClass" class="form-control"></select></div>
+        <div class="form-group"><label class="form-label">분류</label>
+          <select id="newType" class="form-control"><option value="일반">일반</option><option value="새친구">새친구</option></select></div>
+        <button class="btn btn-success btn-full" onclick="doAddStudent()">학생 추가</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let allStudents = [];
+let allClasses = [];
+let rankData = [];
+let criteria = {};
+
+function initLogin() {
+  callApi('apiGetTeacherList', [], function(err, list) {
+    if (err) return;
+    const sel = document.getElementById('adminSelect');
+    list.filter(t => t.role === '임원').forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function doLogin() {
+  const name = document.getElementById('adminSelect').value;
+  const pin = document.getElementById('adminPin').value;
+  if (!name || !pin) { showToast('이름과 핀번호를 입력하세요', 'error'); return; }
+  callApi('apiLogin', [name, pin], function(err, res) {
+    if (err || !res.ok) { showToast(res ? res.message : '로그인 실패', 'error'); return; }
+    if (res.role !== '임원') { showToast('임원 계정이 아닙니다', 'error'); return; }
+    showMain();
+  });
+}
+
+function logout() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('mainScreen').style.display = 'none';
+}
+
+function showMain() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainScreen').style.display = 'block';
+  loadAllData();
+  setSummaryThisSunday();
+  document.getElementById('birthdayMonth').value = new Date().getMonth() + 1;
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function loadAllData() {
+  callApi('apiGetTotalScores', [], function(err, data) {
+    if (err) return;
+    rankData = data;
+    allStudents = data;
+    populateRankFilter();
+    renderRank();
+    populateMoveStudents();
+  });
+  callApi('apiGetClassList', [], function(err, data) {
+    if (err) return;
+    allClasses = data;
+    populateMoveTargetClass();
+    populateNewClass();
+  });
+  callApi('apiGetScoreCriteria', [], function(err, data) {
+    if (err) return;
+    criteria = data;
+    renderCriteria();
+  });
+}
+
+// 주간 현황
+function setSummaryThisSunday() {
+  const d = new Date(); d.setDate(d.getDate() - d.getDay());
+  document.getElementById('summaryDate').value = d.getFullYear() + '-' + padZero(d.getMonth()+1) + '-' + padZero(d.getDate());
+  loadSummary();
+}
+
+function loadSummary() {
+  const date = document.getElementById('summaryDate').value;
+  if (!date) return;
+  callApi('apiGetWeeklySummary', [date], function(err, data) {
+    if (err) return;
+    let html = '';
+    ['1부', '2부'].forEach(part => {
+      const p = data[part] || {};
+      html += `<div class="card" style="margin-top:10px">
+        <div class="card-title">${part} 출석 현황</div>
+        <div class="summary-cell">
+          <div class="grade-row"><span>3학년</span><span class="count">${p['3학년']||0}명</span></div>
+          <div class="grade-row"><span>4학년</span><span class="count">${p['4학년']||0}명</span></div>
+          <div class="grade-row"><span>새친구</span><span class="count">${p['새친구']||0}명</span></div>
+          <div class="grade-row" style="font-weight:700;border-top:2px solid #e2e8f0;margin-top:4px;padding-top:8px">
+            <span>합계</span><span class="count">${(p['3학년']||0)+(p['4학년']||0)+(p['새친구']||0)}명</span>
+          </div>
+        </div>
+      </div>`;
+    });
+    document.getElementById('summaryContent').innerHTML = html;
+  });
+}
+
+// 점수 순위
+function populateRankFilter() {
+  const sel = document.getElementById('rankFilter');
+  const classes = [...new Set(rankData.map(s => s.class))].sort();
+  classes.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
+}
+
+function renderRank() {
+  const filter = document.getElementById('rankFilter').value;
+  const sort = document.getElementById('rankSort').value;
+  let data = filter ? rankData.filter(s => s.class === filter) : [...rankData];
+  if (sort === 'class') data.sort((a,b) => a.class.localeCompare(b.class) || b.totalScore - a.totalScore);
+  else data.sort((a,b) => b.totalScore - a.totalScore);
+
+  let html = `<table class="rank-table">
+    <thead><tr><th>순위</th><th>이름</th><th>반</th><th>점수</th></tr></thead><tbody>`;
+  data.forEach((s, i) => {
+    const cls = i === 0 ? ' rank-1' : i === 1 ? ' rank-2' : i === 2 ? ' rank-3' : '';
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+    html += `<tr class="${cls}">
+      <td class="rank-num">${medal || (i+1)}</td>
+      <td>${s.name}</td><td>${s.class}</td>
+      <td style="font-weight:700;color:#276749">${s.totalScore}점</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('rankContent').innerHTML = html;
+}
+
+// 반 이동
+function populateMoveStudents() {
+  const sel = document.getElementById('moveStudent');
+  sel.innerHTML = '<option value="">-- 학생 선택 --</option>';
+  const sorted = [...allStudents].sort((a,b) => a.class.localeCompare(b.class));
+  sorted.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = s.name + ' (' + s.class + ')';
+    opt.dataset.class = s.class;
+    opt.dataset.part = s.part;
+    opt.dataset.grade = s.grade;
+    sel.appendChild(opt);
+  });
+}
+
+function onSelectMoveStudent() {
+  const sel = document.getElementById('moveStudent');
+  const opt = sel.options[sel.selectedIndex];
+  const info = document.getElementById('moveStudentInfo');
+  if (!opt.value) { info.textContent = ''; return; }
+  info.textContent = `현재: ${opt.dataset.class} | ${opt.dataset.part} | ${opt.dataset.grade}학년`;
+}
+
+function populateMoveTargetClass() {
+  const sel = document.getElementById('moveTargetClass');
+  sel.innerHTML = '<option value="">-- 반 선택 --</option>';
+  allClasses.sort((a,b) => a.name.localeCompare(b.name)).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.name;
+    opt.dataset.teacher = c.teacher;
+    opt.textContent = c.name + ' (' + c.teacher + ')';
+    sel.appendChild(opt);
+  });
+}
+
+function doMoveStudent() {
+  const stuSel = document.getElementById('moveStudent');
+  const clsSel = document.getElementById('moveTargetClass');
+  const studentId = stuSel.value;
+  const newClass = clsSel.value;
+  const newTeacher = clsSel.options[clsSel.selectedIndex].dataset.teacher || '';
+  if (!studentId || !newClass) { showToast('학생과 반을 모두 선택하세요', 'error'); return; }
+  if (!confirm(stuSel.options[stuSel.selectedIndex].textContent.split('(')[0].trim() + ' 학생을 ' + newClass + '으로 이동할까요?')) return;
+  callApi('apiMoveStudent', [studentId, newClass, newTeacher], function(err, res) {
+    if (err || !res.ok) { showToast('이동 실패: ' + (res ? res.message : ''), 'error'); return; }
+    showToast('✅ 반 이동 완료!', 'success');
+    loadAllData();
+  });
+}
+
+// 생일
+function loadBirthdays() {
+  const month = document.getElementById('birthdayMonth').value;
+  callApi('apiGetBirthdays', [month], function(err, data) {
+    if (err) return;
+    if (!data.length) { document.getElementById('birthdayList').innerHTML = '<div style="padding:20px;text-align:center;color:#718096">이번 달 생일자가 없습니다</div>'; return; }
+    let html = '';
+    data.forEach(s => {
+      const bd = s.birthday ? s.birthday.substring(5) : '';
+      html += `<div class="birthday-item">
+        <span class="birthday-icon">🎂</span>
+        <div>
+          <div class="birthday-name">${s.name} <span class="badge badge-blue">${s.class}</span></div>
+          <div class="birthday-date">${bd}</div>
+        </div>
+      </div>`;
+    });
+    document.getElementById('birthdayList').innerHTML = html;
+  });
+}
+
+// 점수기준
+function renderCriteria() {
+  const items = ['예배','성경지참','암송','성경읽기','전도'];
+  let html = '';
+  items.forEach(name => {
+    html += `<div class="criteria-item">
+      <span class="criteria-name">${name}</span>
+      <input type="number" class="criteria-input" id="cri_${name}" value="${criteria[name]||0}" min="0">
+      <span style="font-size:14px;color:#718096">점</span>
+    </div>`;
+  });
+  document.getElementById('criteriaList').innerHTML = html;
+}
+
+function saveCriteria() {
+  const items = ['예배','성경지참','암송','성경읽기','전도'].map(name => ({
+    name, score: Number(document.getElementById('cri_' + name).value)
+  }));
+  callApi('apiUpdateCriteria', [JSON.stringify(items)], function(err, res) {
+    if (err || !res.ok) { showToast('저장 실패', 'error'); return; }
+    items.forEach(i => { criteria[i.name] = i.score; });
+    showToast('✅ 점수 기준 저장 완료!', 'success');
+  });
+}
+
+// 학생 추가
+function populateNewClass() {
+  const sel = document.getElementById('newClass');
+  sel.innerHTML = '';
+  allClasses.sort((a,b) => a.name.localeCompare(b.name)).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.name; opt.textContent = c.name;
+    sel.appendChild(opt);
+  });
+}
+
+function doAddStudent() {
+  const cls = allClasses.find(c => c.name === document.getElementById('newClass').value) || {};
+  const data = {
+    name: document.getElementById('newName').value.trim(),
+    gender: document.getElementById('newGender').value,
+    birthday: document.getElementById('newBirthday').value,
+    contact: document.getElementById('newContact').value,
+    part: document.getElementById('newPart').value,
+    grade: document.getElementById('newGrade').value,
+    class: document.getElementById('newClass').value,
+    teacher: cls.teacher || '',
+    type: document.getElementById('newType').value,
+    newDate: document.getElementById('newType').value === '새친구' ? todayStr() : '',
+    newVisits: 0
+  };
+  if (!data.name) { showToast('이름을 입력하세요', 'error'); return; }
+  callApi('apiAddStudent', [JSON.stringify(data)], function(err, res) {
+    if (err || !res.ok) { showToast('추가 실패', 'error'); return; }
+    showToast('✅ 학생 추가 완료!', 'success');
+    document.getElementById('newName').value = '';
+    loadAllData();
+  });
+}
+
+initLogin();
+</script>
+</body>
+</html>

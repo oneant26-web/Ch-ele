@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>점수입력 - 동신교회 초등부</title>
+<?!= include('Common'); ?>
+<style>
+  .login-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #2c5282, #4299e1);
+    padding: 24px;
+  }
+  .login-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px 24px;
+    width: 100%;
+    max-width: 360px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  }
+  .login-logo { text-align: center; font-size: 40px; margin-bottom: 16px; }
+  .login-title { text-align: center; font-size: 20px; font-weight: 700; color: #2c5282; margin-bottom: 24px; }
+  .pin-dots { display: flex; justify-content: center; gap: 12px; margin: 16px 0; }
+  .pin-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid #cbd5e0;
+    background: #fff;
+    transition: all 0.15s;
+  }
+  .pin-dot.filled { background: #2c5282; border-color: #2c5282; }
+  .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+  .pin-key {
+    background: #f7fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 22px;
+    font-weight: 600;
+    padding: 14px;
+    cursor: pointer;
+    text-align: center;
+    min-height: 56px;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pin-key:active { background: #e2e8f0; transform: scale(0.94); }
+  .pin-key.del { font-size: 18px; color: #e53e3e; }
+
+  .main-screen { display: none; }
+
+  .date-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #ebf4ff;
+    padding: 12px 16px;
+    border-bottom: 1px solid #bee3f8;
+  }
+  .date-selector label { font-size: 14px; font-weight: 600; color: #2c5282; white-space: nowrap; }
+  .date-selector input { flex: 1; border: 2px solid #bee3f8; border-radius: 8px; padding: 8px 10px; font-size: 15px; }
+
+  .student-score-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 2px solid #e2e8f0;
+  }
+  .student-score-card.absent { border-color: #fed7d7; background: #fff5f5; }
+  .student-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .student-name { font-size: 18px; font-weight: 700; color: #2d3748; }
+  .student-total { font-size: 15px; font-weight: 700; color: #276749; }
+
+  .score-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .score-item { display: flex; flex-direction: column; gap: 4px; }
+  .score-label { font-size: 13px; color: #718096; font-weight: 600; }
+  .score-toggle {
+    min-height: 48px;
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+    background: #f7fafc;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    color: #4a5568;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .score-toggle.on { background: #276749; border-color: #276749; color: #fff; }
+  .score-toggle:active { transform: scale(0.95); }
+
+  .reading-input {
+    min-height: 48px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 17px;
+    text-align: center;
+    width: 100%;
+    background: #f7fafc;
+    padding: 8px;
+  }
+  .reading-input:focus { border-color: #4299e1; outline: none; }
+
+  .absent-input {
+    width: 100%;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 15px;
+    padding: 10px 12px;
+    background: #f7fafc;
+    grid-column: 1 / -1;
+    min-height: 48px;
+  }
+
+  .class-total-bar {
+    background: #f0fff4;
+    border: 2px solid #c6f6d5;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .class-total-bar .label { font-size: 15px; color: #276749; font-weight: 600; }
+  .class-total-bar .value { font-size: 22px; font-weight: 800; color: #276749; }
+
+  .save-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #fff;
+    padding: 12px 16px;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.12);
+    z-index: 50;
+  }
+  .pb-safe { padding-bottom: 80px; }
+</style>
+</head>
+<body>
+<div id="loading" class="loading-overlay" style="display:none"><div class="loading-spinner"></div></div>
+<div id="toast" class="toast"></div>
+
+<!-- 로그인 화면 -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">⛪</div>
+    <div class="login-title">선생님 로그인</div>
+    <div class="form-group">
+      <label class="form-label">선생님 이름</label>
+      <select id="teacherSelect" class="form-control">
+        <option value="">-- 선택하세요 --</option>
+      </select>
+    </div>
+    <div class="form-label" style="margin-bottom:8px">핀번호 4자리</div>
+    <div class="pin-dots">
+      <div class="pin-dot" id="dot0"></div>
+      <div class="pin-dot" id="dot1"></div>
+      <div class="pin-dot" id="dot2"></div>
+      <div class="pin-dot" id="dot3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pressPin('1')">1</button>
+      <button class="pin-key" onclick="pressPin('2')">2</button>
+      <button class="pin-key" onclick="pressPin('3')">3</button>
+      <button class="pin-key" onclick="pressPin('4')">4</button>
+      <button class="pin-key" onclick="pressPin('5')">5</button>
+      <button class="pin-key" onclick="pressPin('6')">6</button>
+      <button class="pin-key" onclick="pressPin('7')">7</button>
+      <button class="pin-key" onclick="pressPin('8')">8</button>
+      <button class="pin-key" onclick="pressPin('9')">9</button>
+      <button class="pin-key del" onclick="clearPin()">지우기</button>
+      <button class="pin-key" onclick="pressPin('0')">0</button>
+      <button class="pin-key" onclick="doLogin()">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 메인 화면 -->
+<div id="mainScreen" class="main-screen">
+  <div class="top-bar">
+    <button class="back-btn" onclick="logout()">← 로그아웃</button>
+    <h1 id="mainTitle">점수 입력</h1>
+  </div>
+
+  <div class="date-selector">
+    <label>날짜</label>
+    <input type="date" id="targetDate" onchange="loadScores()">
+    <button class="btn btn-outline" style="white-space:nowrap;min-width:80px" onclick="setThisSunday()">이번 주</button>
+  </div>
+
+  <div class="container pb-safe">
+    <div class="class-total-bar">
+      <span class="label">반 전체 점수</span>
+      <span class="value" id="classTotalScore">0점</span>
+    </div>
+    <div id="scoreList"></div>
+  </div>
+
+  <div class="save-bar">
+    <button class="btn btn-success btn-full" onclick="saveAll()" style="font-size:18px">💾 전체 저장</button>
+  </div>
+</div>
+
+<script>
+let userInfo = null;
+let students = [];
+let scoreData = {};
+let criteria = {};
+let pinStr = '';
+
+function initLogin() {
+  callApi('apiGetTeacherList', [], function(err, list) {
+    if (err) return;
+    const sel = document.getElementById('teacherSelect');
+    list.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name;
+      opt.textContent = t.name + (t.role === '임원' ? ' (임원)' : '');
+      sel.appendChild(opt);
+    });
+  });
+  callApi('apiGetScoreCriteria', [], function(err, data) {
+    if (!err) criteria = data;
+  });
+}
+
+function pressPin(d) {
+  if (pinStr.length >= 4) return;
+  pinStr += d;
+  updateDots();
+  if (pinStr.length === 4) setTimeout(doLogin, 200);
+}
+
+function clearPin() {
+  pinStr = pinStr.slice(0, -1);
+  updateDots();
+}
+
+function updateDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('dot' + i).classList.toggle('filled', i < pinStr.length);
+  }
+}
+
+function doLogin() {
+  const name = document.getElementById('teacherSelect').value;
+  if (!name) { showToast('선생님 이름을 선택하세요', 'error'); pinStr = ''; updateDots(); return; }
+  if (pinStr.length !== 4) { showToast('핀번호 4자리를 입력하세요', 'error'); return; }
+  callApi('apiLogin', [name, pinStr], function(err, res) {
+    pinStr = ''; updateDots();
+    if (err || !res.ok) { showToast(res ? res.message : '로그인 실패', 'error'); return; }
+    userInfo = res;
+    showMain();
+  });
+}
+
+function showMain() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainScreen').style.display = 'block';
+  document.getElementById('mainTitle').textContent = userInfo.class + ' 점수입력';
+  setThisSunday();
+}
+
+function logout() {
+  userInfo = null;
+  pinStr = '';
+  updateDots();
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('mainScreen').style.display = 'none';
+}
+
+function setThisSunday() {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay());
+  document.getElementById('targetDate').value = d.getFullYear() + '-' + padZero(d.getMonth()+1) + '-' + padZero(d.getDate());
+  loadScores();
+}
+
+function loadScores() {
+  const date = document.getElementById('targetDate').value;
+  if (!date) return;
+  callApi('apiGetScoresByClass', [userInfo.class, date], function(err, data) {
+    if (err) return;
+    students = data.students;
+    scoreData = {};
+    students.forEach(s => {
+      scoreData[s.id] = data.scores[s.id] || { worship:0, bible:0, recite:0, reading:0, evangelism:0, absentReason:'' };
+    });
+    renderScores();
+  });
+}
+
+function renderScores() {
+  let html = '';
+  students.forEach(s => {
+    const sc = scoreData[s.id] || {};
+    const total = calcTotal(sc);
+    const isAbsent = !sc.worship && !sc.bible && !sc.recite && !sc.reading && !sc.evangelism;
+    html += `<div class="student-score-card${isAbsent ? ' absent' : ''}" id="card_${s.id}">
+      <div class="student-header">
+        <span class="student-name">${s.name}${s.type === '새친구' ? ' 🌟' : ''}</span>
+        <span class="student-total" id="total_${s.id}">${total}점</span>
+      </div>
+      <div class="score-grid">
+        <div class="score-item">
+          <span class="score-label">예배 (+${criteria['예배']||10}점)</span>
+          <button class="score-toggle${sc.worship?'  on':''}" id="worship_${s.id}" onclick="toggleScore('${s.id}','worship',${criteria['예배']||10})">
+            ${sc.worship ? '✅ 출석' : '❌ 결석'}
+          </button>
+        </div>
+        <div class="score-item">
+          <span class="score-label">성경지참 (+${criteria['성경지참']||5}점)</span>
+          <button class="score-toggle${sc.bible?' on':''}" id="bible_${s.id}" onclick="toggleScore('${s.id}','bible',${criteria['성경지참']||5})">
+            ${sc.bible ? '✅ 가져옴' : '❌ 없음'}
+          </button>
+        </div>
+        <div class="score-item">
+          <span class="score-label">암송 (+${criteria['암송']||5}점)</span>
+          <button class="score-toggle${sc.recite?' on':''}" id="recite_${s.id}" onclick="toggleScore('${s.id}','recite',${criteria['암송']||5})">
+            ${sc.recite ? '✅ 완료' : '❌ 미완'}
+          </button>
+        </div>
+        <div class="score-item">
+          <span class="score-label">전도 (+${criteria['전도']||20}점)</span>
+          <button class="score-toggle${sc.evangelism?' on':''}" id="evangelism_${s.id}" onclick="toggleScore('${s.id}','evangelism',${criteria['전도']||20})">
+            ${sc.evangelism ? '✅ 전도' : '❌ 없음'}
+          </button>
+        </div>
+        <div class="score-item">
+          <span class="score-label">성경읽기 (장수×${criteria['성경읽기']||1}점)</span>
+          <input type="number" class="reading-input" id="reading_${s.id}" min="0" max="150" value="${sc.reading||0}"
+            oninput="updateReading('${s.id}',this.value)" placeholder="0">
+        </div>
+        <div class="score-item">
+          <span class="score-label">결석사유</span>
+          <input type="text" class="absent-input" id="absent_${s.id}" value="${sc.absentReason||''}"
+            oninput="scoreData['${s.id}'].absentReason=this.value" placeholder="결석 시 사유 입력">
+        </div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('scoreList').innerHTML = html;
+  updateClassTotal();
+}
+
+function toggleScore(studentId, field, pts) {
+  const sc = scoreData[studentId];
+  sc[field] = sc[field] ? 0 : pts;
+  const btn = document.getElementById(field + '_' + studentId);
+  btn.classList.toggle('on', !!sc[field]);
+  const labels = { worship: ['✅ 출석','❌ 결석'], bible: ['✅ 가져옴','❌ 없음'],
+                   recite: ['✅ 완료','❌ 미완'], evangelism: ['✅ 전도','❌ 없음'] };
+  btn.textContent = sc[field] ? labels[field][0] : labels[field][1];
+  document.getElementById('total_' + studentId).textContent = calcTotal(sc) + '점';
+  updateClassTotal();
+}
+
+function updateReading(studentId, val) {
+  scoreData[studentId].reading = Number(val) * (criteria['성경읽기'] || 1);
+  document.getElementById('total_' + studentId).textContent = calcTotal(scoreData[studentId]) + '점';
+  updateClassTotal();
+}
+
+function calcTotal(sc) {
+  return (sc.worship||0) + (sc.bible||0) + (sc.recite||0) + (sc.reading||0) + (sc.evangelism||0);
+}
+
+function updateClassTotal() {
+  let total = 0;
+  students.forEach(s => { total += calcTotal(scoreData[s.id] || {}); });
+  document.getElementById('classTotalScore').textContent = total + '점';
+}
+
+function saveAll() {
+  const date = document.getElementById('targetDate').value;
+  if (!date) { showToast('날짜를 선택하세요', 'error'); return; }
+  callApi('apiSaveScores', [userInfo.class, date, JSON.stringify(scoreData), userInfo.name], function(err, res) {
+    if (err || !res.ok) { showToast('저장 실패', 'error'); return; }
+    showToast('✅ 저장 완료!', 'success');
+  });
+}
+
+initLogin();
+</script>
+</body>
+</html>
