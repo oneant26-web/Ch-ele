@@ -40,7 +40,7 @@ const COL_CRI = { ITEM: 0, SCORE: 1, DATE: 2 };
 // 웹앱 진입점
 // ============================================================
 function doGet(e) {
-  const params = e.parameter;
+  const params = (e && e.parameter) ? e.parameter : {};
   const page = params.page || 'attendance';
 
   let tmpl;
